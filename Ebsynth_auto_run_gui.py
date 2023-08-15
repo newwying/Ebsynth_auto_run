@@ -20,14 +20,6 @@ project_directory = os.getcwd()
 original_directory = project_directory
 
 
-def check_for_termination():
-    # 检查是否按下了shift+alt+q组合键，如果按下则终止程序
-    if keyboard.is_pressed("shift+alt+q"):
-        custom_print("程序终止")
-        terminate_program = True
-        os._exit(0)  # 立即终止整个进程
-
-
 def simplify_missing_files(missing_files):
     simplified = []
     i = 0
@@ -142,7 +134,6 @@ def monitor_process(pid, filename):
         custom_print(f"开始监控 {filename}")
         ps_process = psutil.Process(pid)
         while True:
-            check_for_termination()
             if terminate_program:
                 ps_process.terminate()
                 break
@@ -172,15 +163,34 @@ def move_and_resize_window_by_pid(pid, x, y):
     - 如果成功，返回窗口的矩形区域坐标，否则返回None
     """
     try:
+        # 尝试激活 GUI 窗口
+        hwnd = win32gui.FindWindow(None, "Ebsynth Auto Run")  # 使用窗口的标题
+        if hwnd:
+            win32gui.SetForegroundWindow(hwnd)
         window = get_window_by_pid(pid)
         if window:
             win32gui.SetForegroundWindow(window._hWnd)
-            window.moveTo(x, y)
+            window.moveTo(0, 0)
             return get_window_by_pid(pid)._rect
         return None
     except Exception as e:
         custom_print(f"Error moving and resizing window for pid {pid}: {e}")
         return None
+
+def minimize_window_by_pid(pid):
+    """
+    根据给定的进程ID，最小化窗口。
+
+    参数:
+    - pid: 要查找的进程ID
+    """
+    try:
+        window = get_window_by_pid(pid)
+        if window:
+            win32gui.ShowWindow(window._hWnd, win32con.SW_MINIMIZE)
+    except Exception as e:
+        custom_print(f"Error minimizing window for pid {pid}: {e}")
+
 
 
 def get_window_by_pid(pid):
@@ -206,7 +216,8 @@ def start_program(filename):
     try:
         process = subprocess.Popen([associated_program, file_path])
         time.sleep(0.2)
-        rect = move_and_resize_window_by_pid(process.pid, 200, 200)
+        rect = move_and_resize_window_by_pid(process.pid, int(
+            200), int(200))
         if rect:
             custom_print(f"Moved and resized window to: {rect}")
         else:
@@ -226,6 +237,8 @@ def start_program(filename):
 
 
 def run_ebsynth(filename, pid, rect):
+    # 记录鼠标的当前位置
+    original_mouse_position = pyautogui.position()
     try:
         # 是否需要遮罩的判断
         if not Mask_control:
@@ -252,6 +265,7 @@ def run_ebsynth(filename, pid, rect):
             pyautogui.click(result_run)
             custom_print(f"{filename}Run All点击完成。")
             time.sleep(3.0)
+            minimize_window_by_pid(pid)
 
         else:
             custom_print(f"{filename}Run All点击失败！没有找到匹配的图像。")
@@ -259,6 +273,9 @@ def run_ebsynth(filename, pid, rect):
     except Exception as e:
         custom_print(f"Error while processing {filename}: {str(e)}")
         failed_files.append(f"Error while processing {filename}: {str(e)}")
+    finally:
+        # 将鼠标移回原来的位置
+        pyautogui.moveTo(original_mouse_position[0], original_mouse_position[1])
     monitor_process(pid, filename)
     time.sleep(0.2)
     semaphore.release()  # 任务完成后释放 permit
@@ -316,9 +333,9 @@ def main():
     with ThreadPoolExecutor(max_workers=Max_workers) as executor:
         # 开始工作次数的循环
         for wenjianming in ebs_files[:]:
+            semaphore.acquire()  # 尝试获取一个 permit
             if terminate_program:
                 break
-            semaphore.acquire()  # 尝试获取一个 permit
             # executor.submit(custom_print, wenjianming)
             executor.submit(start_program, wenjianming)
             time.sleep(5)
