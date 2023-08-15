@@ -1,3 +1,4 @@
+[English version](README_EN.md)
 # Ebsynth自动化工具
 
 ## 简介：
