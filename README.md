@@ -7,7 +7,7 @@
 ## 安装：（如果出现问题可尝试虚拟环境下安装）
 1. 克隆GitHub仓库或下载ZIP文件。
 2. 使用适当的Python环境（本机开发环境Python3.9）。
-3. 在命令行中运行`cd`+`目录路径`。
+3. 在命令行中运行`cd`+`目录路径`，如`cd C:\Users\Downloads\Ebsynth_auto_run-main`。
 4. 安装所需的依赖项：（网络问题可替换清华源）。
     ```
     pip install -r requirements.txt
