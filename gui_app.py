@@ -129,6 +129,8 @@ def terminate_program():
 root = tk.Tk()
 
 root.title("Ebsynth Auto Run")
+# 隐藏最小化按钮
+root.attributes('-toolwindow', True)
 
 frame = ttk.Frame(root)
 frame.pack(padx=10, pady=10)
@@ -188,4 +190,5 @@ root.geometry("-400+200")
 load_config()
 
 display_initial_info()
+root.attributes('-topmost', True)
 root.mainloop()

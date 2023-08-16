@@ -157,7 +157,7 @@ def monitor_process(pid, filename):
         custom_print(f"Error monitoring process for {filename}: {e}")
 
 
-def move_and_resize_window_by_pid(pid, x, y):
+def move_and_resize_window_by_pid(pid, x, y, timeout=5):
     """
     根据给定的进程ID，将窗口移动并调整到指定位置和大小。
 
@@ -169,20 +169,19 @@ def move_and_resize_window_by_pid(pid, x, y):
     返回:
     - 如果成功，返回窗口的矩形区域坐标，否则返回None
     """
-    try:
-        # 尝试激活 GUI 窗口
-        hwnd = win32gui.FindWindow(None, "Ebsynth Auto Run")  # 使用窗口的标题
-        if hwnd:
-            win32gui.SetForegroundWindow(hwnd)
+    get_window_time = time.time()
+
+    while time.time() - get_window_time < timeout:
         window = get_window_by_pid(pid)
         if window:
-            win32gui.SetForegroundWindow(window._hWnd)
-            window.moveTo(0, 0)
-            return get_window_by_pid(pid)._rect
-        return None
-    except Exception as e:
-        custom_print(f"Error moving and resizing window for pid {pid}: {e}")
-        return None
+            try:
+                win32gui.SetForegroundWindow(window._hWnd)
+                window.moveTo(0, 0)
+                return window._rect
+            except Exception as e:
+                custom_print(f"Error moving and resizing window for pid {pid}: {e}")
+                return None
+        time.sleep(0.5)  # 等待一小段时间再次尝试
 
 
 def minimize_window_by_pid(pid):
@@ -290,6 +289,7 @@ def run_ebsynth(filename, pid, rect):
 
 
 def main():
+    start_time = time.time()
     global Mask_control, Max_workers, WAIT_EXIT_REMOTE_DESKTOP
     global project_directory, associated_program, resized_folder, original_directory
     global failed_files, semaphore, terminate_program
@@ -366,3 +366,5 @@ def main():
         custom_print(f"Error check_missing_files: {e}")
     # 在程序的最后，删除resize_images文件夹
     delete_resized_folder(resized_folder)
+    end_time = round(time.time() - start_time, 1)
+    custom_print(f"总共用时：{end_time} s")
