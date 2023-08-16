@@ -1,38 +1,47 @@
 # Ebsynth Automation Tool
 
 ## Introduction:
-This tool aims to automate the Ebsynth operation process.
+This tool is designed to automate the Ebsynth workflow.
 
-## Installation:
+## Direct Use (No Installation Needed):
+Double-click to run `ebsynth_auto_run_app.exe`.
+
+## Installation (If you encounter issues, try installing in a virtual environment):
 1. Clone the GitHub repository or download the ZIP file.
 2. Use the appropriate Python environment (developed on Python3.9 locally).
-3. Navigate to the directory using `cd` followed by the directory path in the command line.
-4. Install the required dependencies (you can switch to Tsinghua source if there's an internet issue):
+3. In the command line, navigate to the directory using `cd` followed by the `directory path`, e.g., `cd C:\Users\Downloads\Ebsynth_auto_run-main`.
+4. Install the necessary dependencies (replace with Tsinghua source if there are network issues):
     ```
     pip install -r requirements.txt
     ```
 
-## Configuration (can also be modified in the GUI):
+## Installation in a Virtual Environment:
+1. Double-click to run `create_venv.bat`.
+
+## Configuration (Can also be modified in the GUI):
 Use `ebsynth_auto_run_config.ini` for configuration. You can edit the following parameters:
-- **Mask_control**: Whether you need a mask (Mask Control button). If not needed, set to False. Default is True.
-- **Max_workers**: Number of ebsynth files to run simultaneously, depending on your computer's capacity. Default is 3.
-- **WAIT_EXIT_REMOTE_DESKTOP**: Exit remote desktop within 30 seconds. Remote desktop might impact mouse clicks (you can try it out first). There's no delay by default; change to True if needed. Default is False.
+- **Mask_control**: Determine if you need a mask (overlay button). Set to False if not needed. Default is True.
+- **Max_workers**: Number of Ebsynth files to run simultaneously, depending on your computer's capacity. Default is 3.
+- **WAIT_EXIT_REMOTE_DESKTOP**: Exit remote desktop within 30 seconds. Remote desktop might affect mouse clicks (you can test it first). Default is no delay; set to True if needed. Default is False.
 
 ## Usage:
-1. Double-click `RunMe.bat`.
-2. Select the directory of the ebs files you wish to automate.
+1. Double-click to run `RunMe.bat` (In a virtual environment, double-click to run `RunMe_venv.bat`).
+2. Select the directory of the ebs files you want to automate.
 3. Click `Start` to begin automation.
-4. After starting the program, do not move the mouse to the corners of the screen, as it may cause program errors.
-5. Once the program completes, it will automatically check the integrity of ebs output files against the image sequence in the `video_frame` folder. If there are no missing parts, it will return "Ebsynth generated image integrity check passed!".
 ![GUI Schematic](./images/gui.png)
 
 ## Termination:
 At any time, you can click `Terminate` to stop the program.
 
-## Troubleshooting:
-1. Ensure that all image files and Ebsynth files are in the correct directories.
-2. If you encounter issues, check the configuration in `ebsynth_auto_run_config.ini` or refer to the error messages in the output section.
+## Points to Note:
+1. Ensure all image files and Ebsynth files are in the correct directory.
+2. If you encounter issues, check if `ebsynth_auto_run_config.ini` is configured correctly or refer to the error messages in the output bar.
+3. After starting the program, do not move the mouse to the screen corners, as it may cause errors!
+4. After starting the program, keep the GUI at the forefront!
+5. After the program finishes running, it will automatically check for missing image sequences in the `video_frame` folder compared to ebs output files. If none are missing, it will return "Ebsynth image integrity check passed!".
 
-## Note:
-- This tool automates the Ebsynth process. Ensure you have the necessary permissions and all the dependencies.
-- It's a good idea to do a manual test before using it to make sure everything is working properly.
+## Caution:
+- This tool automates the Ebsynth process, ensure you have the necessary permissions and all dependencies.
+- Before using, it's a good practice to run a manual test to ensure everything is working properly.
+
+---
