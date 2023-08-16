@@ -16,13 +16,26 @@ from concurrent.futures import ThreadPoolExecutor
 import keyboard
 import configparser
 
+project_directory = os.getcwd()
+original_directory = project_directory
+
 
 def check_for_termination():
     # 检查是否按下了shift+alt+q组合键，如果按下则终止程序
     if keyboard.is_pressed("shift+alt+q"):
         custom_print("程序终止")
         terminate_program = True
-        os._exit(0)  # 立即终止整个进程
+
+
+def load_config():
+    config = configparser.ConfigParser()
+    with open('ebsynth_auto_run_config.ini', 'r', encoding='utf-8') as config_file:
+        config.read_file(config_file)
+    return {
+        "Mask_control": config.getboolean('DEFAULT', 'Mask_control'),
+        "Max_workers": config.getint('DEFAULT', 'Max_workers'),
+        "WAIT_EXIT_REMOTE_DESKTOP": config.getboolean('DEFAULT', 'WAIT_EXIT_REMOTE_DESKTOP')
+    }
 
 
 def simplify_missing_files(missing_files):
@@ -141,6 +154,7 @@ def monitor_process(pid, filename):
         while True:
             check_for_termination()
             if terminate_program:
+                ps_process.terminate()
                 break
             time.sleep(0.5)
             cpu_percent = ps_process.cpu_percent(interval=1)
@@ -168,15 +182,34 @@ def move_and_resize_window_by_pid(pid, x, y):
     - 如果成功，返回窗口的矩形区域坐标，否则返回None
     """
     try:
+        # 尝试激活 GUI 窗口
+        hwnd = win32gui.FindWindow(None, "Ebsynth Auto Run")  # 使用窗口的标题
+        if hwnd:
+            win32gui.SetForegroundWindow(hwnd)
         window = get_window_by_pid(pid)
         if window:
             win32gui.SetForegroundWindow(window._hWnd)
-            window.moveTo(x, y)
+            window.moveTo(0, 0)
             return get_window_by_pid(pid)._rect
         return None
     except Exception as e:
         custom_print(f"Error moving and resizing window for pid {pid}: {e}")
         return None
+
+
+def minimize_window_by_pid(pid):
+    """
+    根据给定的进程ID，最小化窗口。
+
+    参数:
+    - pid: 要查找的进程ID
+    """
+    try:
+        window = get_window_by_pid(pid)
+        if window:
+            win32gui.ShowWindow(window._hWnd, win32con.SW_MINIMIZE)
+    except Exception as e:
+        custom_print(f"Error minimizing window for pid {pid}: {e}")
 
 
 def get_window_by_pid(pid):
@@ -202,7 +235,8 @@ def start_program(filename):
     try:
         process = subprocess.Popen([associated_program, file_path])
         time.sleep(0.2)
-        rect = move_and_resize_window_by_pid(process.pid, 200, 200)
+        rect = move_and_resize_window_by_pid(process.pid, int(
+            200), int(200))
         if rect:
             custom_print(f"Moved and resized window to: {rect}")
         else:
@@ -222,6 +256,8 @@ def start_program(filename):
 
 
 def run_ebsynth(filename, pid, rect):
+    # 记录鼠标的当前位置
+    original_mouse_position = pyautogui.position()
     try:
         # 是否需要遮罩的判断
         if not Mask_control:
@@ -248,6 +284,7 @@ def run_ebsynth(filename, pid, rect):
             pyautogui.click(result_run)
             custom_print(f"{filename}Run All点击完成。")
             time.sleep(3.0)
+            minimize_window_by_pid(pid)
 
         else:
             custom_print(f"{filename}Run All点击失败！没有找到匹配的图像。")
@@ -255,6 +292,10 @@ def run_ebsynth(filename, pid, rect):
     except Exception as e:
         custom_print(f"Error while processing {filename}: {str(e)}")
         failed_files.append(f"Error while processing {filename}: {str(e)}")
+    finally:
+        # 将鼠标移回原来的位置
+        pyautogui.moveTo(
+            original_mouse_position[0], original_mouse_position[1])
     monitor_process(pid, filename)
     time.sleep(0.2)
     semaphore.release()  # 任务完成后释放 permit
@@ -262,16 +303,16 @@ def run_ebsynth(filename, pid, rect):
 
 def main():
     global Mask_control, Max_workers, WAIT_EXIT_REMOTE_DESKTOP
-    global project_directory, associated_program, resized_folder
+    global project_directory, associated_program, resized_folder, original_directory
     global failed_files, semaphore, terminate_program
-    config = configparser.ConfigParser()
-    with open('ebsynth_auto_run_config.ini', 'r', encoding='utf-8') as config_file:
-        config.read_file(config_file)
+    # config = configparser.ConfigParser()
+    # with open('ebsynth_auto_run_config.ini', 'r', encoding='utf-8') as config_file:
+    #     config.read_file(config_file)
 
-    Mask_control = config.getboolean('DEFAULT', 'Mask_control')
-    Max_workers = config.getint('DEFAULT', 'Max_workers')
-    WAIT_EXIT_REMOTE_DESKTOP = config.getboolean(
-        'DEFAULT', 'WAIT_EXIT_REMOTE_DESKTOP')
+    # Mask_control = config.getboolean('DEFAULT', 'Mask_control')
+    # Max_workers = config.getint('DEFAULT', 'Max_workers')
+    # WAIT_EXIT_REMOTE_DESKTOP = config.getboolean(
+    #     'DEFAULT', 'WAIT_EXIT_REMOTE_DESKTOP')
 
     failed_files = []
     semaphore = threading.Semaphore(Max_workers)
@@ -279,7 +320,6 @@ def main():
     if WAIT_EXIT_REMOTE_DESKTOP:
         custom_print("开始等待，请在30秒内退出远程桌面！")
         time.sleep(30)
-    project_directory = os.getcwd()
     extension = ".ebs"
     associated_program = get_default_program(extension)
     custom_print(f" {extension} 的可执行程序位置: \n{associated_program}")
@@ -292,7 +332,7 @@ def main():
     try:
         # 在调整图像大小之前调用此函数
         resized_folder = create_and_copy_to_resized_folder(
-            os.path.join(project_directory, "Ebsynth_auto_run_png"))
+            os.path.join(original_directory, "Ebsynth_auto_run_png"))
         resize_images_in_folder(resized_folder, overall_scale_factor)
         custom_print("按钮图片重载完成!")
     except Exception as e:
@@ -312,26 +352,38 @@ def main():
     # 设置最大工作线程数为3，可以根据需要调整
     with ThreadPoolExecutor(max_workers=Max_workers) as executor:
         # 开始工作次数的循环
-        for wenjianming in ebs_files[-4:]:
+        for wenjianming in ebs_files[:]:
             semaphore.acquire()  # 尝试获取一个 permit
+            if terminate_program:
+                break
             # executor.submit(custom_print, wenjianming)
             executor.submit(start_program, wenjianming)
             time.sleep(5)
-
-    custom_print("全部文件运行完毕！！！")
+    if terminate_program:
+        custom_print("*****程序已终止")
+    else:
+        custom_print("全部文件运行完毕！！！")
     if failed_files:
         custom_print("*****运行以下文件出现了错误：", failed_files)
-
-    # 检查生成的文件完整性
-    missing_files = check_missing_files(project_directory)
-    if not missing_files:
-        custom_print("Ebsynth生成图片完整性检查通过！")
-    else:
-        custom_print("Ebsynth没有生成图片:", missing_files)
+    try:
+        # 检查生成的文件完整性
+        missing_files = check_missing_files(project_directory)
+        if not missing_files:
+            custom_print("Ebsynth生成图片完整性检查通过！")
+        else:
+            custom_print("*****Ebsynth没有生成图片:", missing_files)
+    except Exception as e:
+        custom_print(f"Error check_missing_files: {e}")
     # 在程序的最后，删除resize_images文件夹
     delete_resized_folder(resized_folder)
 
 
 if __name__ == "__main__":
+    # 加载配置
+    config = load_config()
+    Mask_control = config["Mask_control"]
+    Max_workers = config["Max_workers"]
+    WAIT_EXIT_REMOTE_DESKTOP = config["WAIT_EXIT_REMOTE_DESKTOP"]
 
+    # 运行主程序
     main()
