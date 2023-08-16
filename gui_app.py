@@ -3,14 +3,20 @@ from tkinter import filedialog, ttk
 import Ebsynth_auto_run_gui  # 请替换为您原始脚本的名称
 import threading
 import configparser
+import sys
 
 all_widgets = []
 
 
 def load_config():
+    config_path = os.path.join(sys._MEIPASS, 'ebsynth_auto_run_config.ini') if getattr(
+        sys, 'frozen', False) else 'ebsynth_auto_run_config.ini'
+
     config = configparser.ConfigParser()
-    with open('ebsynth_auto_run_config.ini', 'r', encoding='utf-8') as config_file:
+    with open(config_path, 'r', encoding='utf-8') as config_file:
         config.read_file(config_file)
+
+    # ... (rest of the function)
 
     # 设置变量的值
     mask_control_var.set(config.getboolean('DEFAULT', 'Mask_control'))

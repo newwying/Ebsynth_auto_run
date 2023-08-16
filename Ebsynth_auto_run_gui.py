@@ -1,3 +1,4 @@
+import sys
 import shutil
 import time
 import os
@@ -13,11 +14,17 @@ from PIL import Image
 import subprocess
 import threading
 from concurrent.futures import ThreadPoolExecutor
-import keyboard
 import configparser
 
 project_directory = os.getcwd()
 original_directory = project_directory
+
+
+def resource_path(relative_path):
+    """ 获取资源的绝对路径，适用于开发模式和PyInstaller模式 """
+    base_path = getattr(sys, '_MEIPASS', os.path.dirname(
+        os.path.abspath(__file__)))
+    return os.path.join(base_path, relative_path)
 
 
 def simplify_missing_files(missing_files):
@@ -177,6 +184,7 @@ def move_and_resize_window_by_pid(pid, x, y):
         custom_print(f"Error moving and resizing window for pid {pid}: {e}")
         return None
 
+
 def minimize_window_by_pid(pid):
     """
     根据给定的进程ID，最小化窗口。
@@ -190,7 +198,6 @@ def minimize_window_by_pid(pid):
             win32gui.ShowWindow(window._hWnd, win32con.SW_MINIMIZE)
     except Exception as e:
         custom_print(f"Error minimizing window for pid {pid}: {e}")
-
 
 
 def get_window_by_pid(pid):
@@ -275,7 +282,8 @@ def run_ebsynth(filename, pid, rect):
         failed_files.append(f"Error while processing {filename}: {str(e)}")
     finally:
         # 将鼠标移回原来的位置
-        pyautogui.moveTo(original_mouse_position[0], original_mouse_position[1])
+        pyautogui.moveTo(
+            original_mouse_position[0], original_mouse_position[1])
     monitor_process(pid, filename)
     time.sleep(0.2)
     semaphore.release()  # 任务完成后释放 permit
@@ -311,8 +319,10 @@ def main():
     overall_scale_factor = scaling / 100
     try:
         # 在调整图像大小之前调用此函数
+        # resized_folder = create_and_copy_to_resized_folder(
+        #     os.path.join(original_directory, "Ebsynth_auto_run_png"))
         resized_folder = create_and_copy_to_resized_folder(
-            os.path.join(original_directory, "Ebsynth_auto_run_png"))
+            resource_path("Ebsynth_auto_run_png"))
         resize_images_in_folder(resized_folder, overall_scale_factor)
         custom_print("按钮图片重载完成!")
     except Exception as e:
