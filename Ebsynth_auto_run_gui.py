@@ -244,7 +244,7 @@ def start_program(filename):
 
 def run_ebsynth(filename, pid, rect):
     # 记录鼠标的当前位置
-    original_mouse_position = pyautogui.position()
+    # original_mouse_position = pyautogui.position()
     try:
         # 是否需要遮罩的判断
         if not Mask_control:
@@ -279,10 +279,10 @@ def run_ebsynth(filename, pid, rect):
     except Exception as e:
         custom_print(f"Error while processing {filename}: {str(e)}")
         failed_files.append(f"Error while processing {filename}: {str(e)}")
-    finally:
-        # 将鼠标移回原来的位置
-        pyautogui.moveTo(
-            original_mouse_position[0], original_mouse_position[1])
+    # finally:
+    #     # 将鼠标移回原来的位置
+    #     pyautogui.moveTo(
+    #         original_mouse_position[0], original_mouse_position[1])
     monitor_process(pid, filename)
     time.sleep(0.2)
     semaphore.release()  # 任务完成后释放 permit
