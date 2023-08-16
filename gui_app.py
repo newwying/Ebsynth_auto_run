@@ -7,6 +7,16 @@ import sys
 
 all_widgets = []
 
+def display_initial_info():
+    """显示初始化信息到输出文本框中"""
+    custom_print_to_gui("=" * 50)
+    custom_print_to_gui("      Welcome to Ebsynth Auto Run Tool")
+    custom_print_to_gui("=" * 50)
+    custom_print_to_gui("Developed by: newwying")
+    custom_print_to_gui("Open Source Repository:")
+    custom_print_to_gui("https://github.com/newwying/Ebsynth_auto_run")
+    custom_print_to_gui("=" * 50)
+    custom_print_to_gui("\n")  # 一个空行作为分隔
 
 def load_config():
     config_path = os.path.join(sys._MEIPASS, 'ebsynth_auto_run_config.ini') if getattr(
@@ -176,4 +186,6 @@ terminate_button.config(state=tk.DISABLED)
 root.geometry("-400+200")
 
 load_config()
+
+display_initial_info()
 root.mainloop()
