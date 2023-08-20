@@ -1,11 +1,18 @@
 import tkinter as tk
-from tkinter import filedialog, ttk
+from tkinter import filedialog, ttk, messagebox
 import Ebsynth_auto_run_gui  # 请替换为您原始脚本的名称
 import threading
 import configparser
 import sys
+import os
+import time
 
 all_widgets = []
+START = "start"
+PAUSE = "pause"
+RESUME = "resume"
+current_state = START
+
 
 def display_initial_info():
     """显示初始化信息到输出文本框中"""
@@ -13,10 +20,11 @@ def display_initial_info():
     custom_print_to_gui("      Welcome to Ebsynth Auto Run Tool")
     custom_print_to_gui("=" * 50)
     custom_print_to_gui("Developed by: newwying")
-    custom_print_to_gui("Open Source Repository:")
+    custom_print_to_gui("Open Source Repository And Usage Methods:")
     custom_print_to_gui("https://github.com/newwying/Ebsynth_auto_run")
     custom_print_to_gui("=" * 50)
     custom_print_to_gui("\n")  # 一个空行作为分隔
+
 
 def load_config():
     config_path = os.path.join(sys._MEIPASS, 'ebsynth_auto_run_config.ini') if getattr(
@@ -73,12 +81,64 @@ def toggle_wait_exit():
         wait_exit_btn.config(text='Wait Exit: OFF', bg='lightcoral')
 
 
+def toggle_start():
+    global current_state
+    if current_state == START:
+        # Start the process or operation
+        # Change the button label to "Pause"
+        start_button.config(text="Pause", bg='lightcoral')
+        # Update the current state
+        current_state = PAUSE
+        root.attributes('-toolwindow', True)
+        root.attributes('-topmost', True)
+        start_program()
+    elif Ebsynth_auto_run_gui.terminate_program:
+        start_button.config(text="Start", bg='lightgreen')
+        # Update the current state
+        current_state = START
+        root.attributes('-toolwindow', False)
+        root.attributes('-topmost', False)
+    elif current_state == PAUSE:
+        # Pause the process or operation
+        Ebsynth_auto_run_gui.pause_event.clear()
+        # Change the button label to "Resume"
+        start_button.config(text="Resume", bg='lightgreen')
+        # Update the current state
+        current_state = RESUME
+        root.attributes('-toolwindow', False)
+        root.attributes('-topmost', False)
+    elif current_state == RESUME:
+        # Resume the process or operation
+        Ebsynth_auto_run_gui.pause_event.set()
+        # Change the button label back to "Pause"
+        start_button.config(text="Pause", bg='lightcoral')
+        # Update the current state back to PAUSE
+        current_state = PAUSE
+        root.attributes('-toolwindow', True)
+        root.attributes('-topmost', True)
+
+
 def select_directory():
-    directory = filedialog.askdirectory()
+    directory = filedialog.askdirectory(mustexist=True)
     # 如果用户选择了目录，则更新，否则保持原始值
     if directory:
         directory_var.set(directory)
         Ebsynth_auto_run_gui.project_directory = directory
+
+
+def select_files():
+    paths = filedialog.askopenfilenames(title="Select Directory or Files",
+                                        filetypes=[("EBS Files", "*.ebs")])
+
+    if paths:
+        # 获取所有文件名，使用os.path.basename
+        ebs_files = [os.path.basename(path) for path in paths]
+
+        # 获取所有文件的公共目录，使用os.path.dirname
+        common_directory = os.path.dirname(paths[0])
+        directory_var.set(';'.join(ebs_files))
+        Ebsynth_auto_run_gui.ebs_files = ebs_files
+        Ebsynth_auto_run_gui.project_directory = common_directory
 
 
 def disable_all_widgets():
@@ -94,7 +154,31 @@ def enable_all_widgets():
 
 def monitor_thread(thread):
     thread.join()  # Wait for the main program thread to finish
+    if Ebsynth_auto_run_gui.failed_filename:
+        failed_filename = sorted(
+            list(set(Ebsynth_auto_run_gui.failed_filename)))
+        # Show a message box to the user
+        error_message = "The following files had errors:\n{}\nDo you want to retry these files?".format(
+            '\n'.join(failed_filename))
+        response = messagebox.askyesno("Error", error_message)
+
+        if response:
+            # Call the function to retry processing the failed files
+            enable_all_widgets()
+            retry_failed_files()
+            return
+    toggle_start()
     enable_all_widgets()  # Enable all widgets after the thread completes
+    # Ebsynth_auto_run_gui.ebs_files = []
+    Ebsynth_auto_run_gui.failed_filename = []
+
+
+def retry_failed_files():
+    global current_state
+    # Logic to retry processing the failed files
+    # Update the current state
+    current_state = START
+    toggle_start()
 
 
 def start_program():
@@ -115,6 +199,7 @@ def start_program():
     # 单独启用 "Terminate" 按钮
     # 假设您的Terminate按钮的变量名是terminate_button
     terminate_button.config(state=tk.NORMAL)
+    start_button.config(state=tk.NORMAL)
     # Create another thread to monitor the main program thread
     monitor = threading.Thread(target=monitor_thread, args=(thread,))
     monitor.start()
@@ -122,15 +207,18 @@ def start_program():
 
 def terminate_program():
     Ebsynth_auto_run_gui.terminate_program = True
+    # toggle_start()
     # 启用所有的按钮和控件
     enable_all_widgets()
+    Ebsynth_auto_run_gui.pause_event.set()
 
 
 root = tk.Tk()
 
-root.title("Ebsynth Auto Run")
+root.title("Ebsynth Auto Run V1.1")
 # 隐藏最小化按钮
-root.attributes('-toolwindow', True)
+root.attributes('-toolwindow', False)
+root.attributes('-topmost', False)
 
 frame = ttk.Frame(root)
 frame.pack(padx=10, pady=10)
@@ -168,6 +256,11 @@ select_directory_btn = tk.Button(
 select_directory_btn.grid(row=2, column=2, pady=(0, 10))
 all_widgets.append(select_directory_btn)
 
+select_files_btn = tk.Button(
+    frame, text="Select Files", command=select_files)
+select_files_btn.grid(row=2, column=3, sticky="w", pady=(0, 10))
+all_widgets.append(select_files_btn)
+
 scrollbar = ttk.Scrollbar(frame)
 scrollbar.grid(row=3, column=3, sticky="ns")
 
@@ -176,7 +269,7 @@ output_text.grid(row=3, column=0, columnspan=3, pady=(10, 10))
 scrollbar.config(command=output_text.yview)
 
 start_button = tk.Button(
-    frame, text="Start", command=start_program, bg='lightgreen')
+    frame, text="Start", command=toggle_start, bg='lightgreen')
 start_button.grid(row=4, column=0, pady=(10, 0))
 all_widgets.append(start_button)
 terminate_button = tk.Button(
@@ -190,5 +283,5 @@ root.geometry("-400+200")
 load_config()
 
 display_initial_info()
-root.attributes('-topmost', True)
+
 root.mainloop()

@@ -18,6 +18,9 @@ import configparser
 
 project_directory = os.getcwd()
 original_directory = project_directory
+ebs_files = []
+pause_event = threading.Event()
+failed_filename = []
 
 
 def resource_path(relative_path):
@@ -137,7 +140,9 @@ def get_default_program(extension):
 
 
 def monitor_process(pid, filename):
+    global failed_files, failed_filename
     try:
+        monitor_time = time.time()
         custom_print(f"开始监控 {filename}")
         ps_process = psutil.Process(pid)
         while True:
@@ -148,11 +153,16 @@ def monitor_process(pid, filename):
             cpu_percent = ps_process.cpu_percent(interval=1)
             if cpu_percent < 0.5:
                 ps_process.terminate()
-                custom_print(f"{filename}运行完毕")
+                if time.time() - monitor_time < 3:
+                    custom_print(f"{filename}运行失败！")
+                    failed_filename.append(filename)
+                else:
+                    custom_print(f"{filename}运行完毕")
                 break
     except psutil.NoSuchProcess:
         custom_print(f"{filename}进程不存在")
         failed_files.append(f"{filename}进程不存在")
+        failed_filename.append(filename)
     except Exception as e:
         custom_print(f"Error monitoring process for {filename}: {e}")
 
@@ -209,12 +219,14 @@ def get_window_by_pid(pid):
 
 
 def start_program(filename):
+    global failed_files, failed_filename
     filepath = os.path.join(project_directory, filename)
 
     # 检查文件是否存在
     if not os.path.exists(filepath):
         custom_print(f"文件 {filepath} 不存在！")
         failed_files.append(f"文件 {filepath} 不存在！")
+        failed_filename.append(filename)
         return
 
     file_path = os.path.join(project_directory, filename)
@@ -231,11 +243,13 @@ def start_program(filename):
     except Exception as e:
         custom_print(f"启动 {file_path} 时出现异常: {e}")
         failed_files.append(f"启动 {file_path} 时出现异常: {e}")
+        failed_filename.append(filename)
         return
 
     if process.returncode:
         custom_print(f"启动 {filepath} 时出现问题，返回码: {process.returncode}")
         failed_files.append(f"启动 {filepath} 时出现问题，返回码: {process.returncode}")
+        failed_filename.append(filename)
         return
 
     pid = process.pid
@@ -243,6 +257,7 @@ def start_program(filename):
 
 
 def run_ebsynth(filename, pid, rect):
+    global failed_files, failed_filename, semaphore
     # 记录鼠标的当前位置
     # original_mouse_position = pyautogui.position()
     try:
@@ -258,6 +273,7 @@ def run_ebsynth(filename, pid, rect):
             else:
                 custom_print(f"{filename}蒙版关闭失败！没有找到匹配的图像。")
                 failed_files.append(f"{filename}蒙版关闭失败！没有找到匹配的图像。")
+                failed_filename.append(filename)
 
         time.sleep(0.2)
 
@@ -276,9 +292,11 @@ def run_ebsynth(filename, pid, rect):
         else:
             custom_print(f"{filename}Run All点击失败！没有找到匹配的图像。")
             failed_files.append(f"{filename}Run All点击失败！没有找到匹配的图像。")
+            failed_filename.append(filename)
     except Exception as e:
         custom_print(f"Error while processing {filename}: {str(e)}")
         failed_files.append(f"Error while processing {filename}: {str(e)}")
+        failed_filename.append(filename)
     # finally:
     #     # 将鼠标移回原来的位置
     #     pyautogui.moveTo(
@@ -292,7 +310,7 @@ def main():
     start_time = time.time()
     global Mask_control, Max_workers, WAIT_EXIT_REMOTE_DESKTOP
     global project_directory, associated_program, resized_folder, original_directory
-    global failed_files, semaphore, terminate_program
+    global failed_files, failed_filename, semaphore, terminate_program, ebs_files
     # config = configparser.ConfigParser()
     # with open('ebsynth_auto_run_config.ini', 'r', encoding='utf-8') as config_file:
     #     config.read_file(config_file)
@@ -302,6 +320,8 @@ def main():
     # WAIT_EXIT_REMOTE_DESKTOP = config.getboolean(
     #     'DEFAULT', 'WAIT_EXIT_REMOTE_DESKTOP')
 
+    # 设置事件为set，以防止一开始就暂停
+    pause_event.set()
     failed_files = []
     semaphore = threading.Semaphore(Max_workers)
     terminate_program = False
@@ -328,27 +348,44 @@ def main():
     except Exception as e:
         custom_print(f"重载按钮图片失败: {e}")
     custom_print("开始Ebsynth自动化。")
+    # if not ebs_files:
+    #     subprocess.run(r'dir *.ebs /b > lists.txt',
+    #                    shell=True, cwd=project_directory)
 
-    subprocess.run(r'dir *.ebs /b > lists.txt',
-                   shell=True, cwd=project_directory)
+    #     ebs_list_file = os.path.join(project_directory, "lists.txt")
 
-    ebs_list_file = os.path.join(project_directory, "lists.txt")
+    #     # 文件全名——参数设置
+    #     with open(ebs_list_file, 'r', encoding='utf-8') as file:
+    #         ebs_files = [line.strip() for line in file.readlines()]
 
-    # 文件全名——参数设置
-    with open(ebs_list_file, 'r', encoding='utf-8') as file:
-        ebs_files = [line.strip() for line in file.readlines()]
+    if not ebs_files:
+        ebs_files = [f for f in os.listdir(
+            project_directory) if f.endswith('.ebs')]
 
     # 使用线程池来监控这个进程
     # 设置最大工作线程数为3，可以根据需要调整
-    with ThreadPoolExecutor(max_workers=Max_workers) as executor:
-        # 开始工作次数的循环
-        for wenjianming in ebs_files[:]:
-            semaphore.acquire()  # 尝试获取一个 permit
-            if terminate_program:
-                break
-            # executor.submit(custom_print, wenjianming)
-            executor.submit(start_program, wenjianming)
-            time.sleep(5)
+    if failed_filename:
+        with ThreadPoolExecutor(max_workers=Max_workers) as executor:
+            # 开始工作次数的循环
+            for wenjianming in failed_filename[:]:
+                pause_event.wait()
+                semaphore.acquire()  # 尝试获取一个 permit
+                if terminate_program:
+                    break
+                # executor.submit(custom_print, wenjianming)
+                executor.submit(start_program, wenjianming)
+                time.sleep(5)
+    else:
+        with ThreadPoolExecutor(max_workers=Max_workers) as executor:
+            # 开始工作次数的循环
+            for wenjianming in ebs_files[:]:
+                pause_event.wait()
+                semaphore.acquire()  # 尝试获取一个 permit
+                if terminate_program:
+                    break
+                # executor.submit(custom_print, wenjianming)
+                executor.submit(start_program, wenjianming)
+                time.sleep(5)
     if terminate_program:
         custom_print("*****程序已终止")
     else:
@@ -368,3 +405,4 @@ def main():
     delete_resized_folder(resized_folder)
     end_time = round(time.time() - start_time, 1)
     custom_print(f"总共用时：{end_time} s")
+    terminate_program = True
